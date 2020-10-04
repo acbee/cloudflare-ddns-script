@@ -52,11 +52,13 @@ CFRECORD_PROXIED=true
 # Ignore local file, update ip anyway
 FORCE=false
 
-WANIPSITE="http://ipv4.icanhazip.com"
+# Override web obtained IP with a specific value
+OVERRIDE=
 
-# Site to retrieve WAN ip, other examples are: bot.whatismyipaddress.com, https://api.ipify.org/ ...
+# Site to use to obtain IP
+# Others: bot.whatismyipaddress.com, https://api.ipify.org/
 if [ "$CFRECORD_TYPE" = "A" ]; then
-  :
+  WANIPSITE="http://ipv4.icanhazip.com"
 elif [ "$CFRECORD_TYPE" = "AAAA" ]; then
   WANIPSITE="http://ipv6.icanhazip.com"
 else
@@ -65,7 +67,7 @@ else
 fi
 
 # get parameter
-while getopts k:u:h:z:t:p:f: opts; do
+while getopts k:u:h:z:t:p:o:f: opts; do
   case ${opts} in
     k) CFKEY=${OPTARG} ;;
     u) CFUSER=${OPTARG} ;;
@@ -73,6 +75,7 @@ while getopts k:u:h:z:t:p:f: opts; do
     z) CFZONE_NAME=${OPTARG} ;;
     t) CFRECORD_TYPE=${OPTARG} ;;
     p) CFRECORD_PROXIED=${OPTARG} ;;
+    o) OVERRIDE=${OPTARG} ;;
     f) FORCE=${OPTARG} ;;
   esac
 done
@@ -100,13 +103,22 @@ if [ "$CFRECORD_NAME" != "$CFZONE_NAME" ] && ! [ -z "${CFRECORD_NAME##*$CFZONE_N
   echo " => Hostname is not a FQDN, assuming $CFRECORD_NAME"
 fi
 
-# Get current and old WAN ip
-WAN_IP=`curl -s ${WANIPSITE}`
+# Decide between override IP or queried IP 
+if [ "$OVERRIDE" != "" ]; then
+  echo "Using IP Override ${OVERRIDE}"
+  WAN_IP=${OVERRIDE}
+else
+  echo "Obtaining IP from ${WANIPSITE}"
+  WAN_IP=`curl -s ${WANIPSITE}`
+  echo "Found IP ${WAN_IP}"
+fi
+
+# Get old WAN ip
 WAN_IP_FILE=$HOME/.cf-wan_ip_$CFRECORD_NAME.txt
 if [ -f $WAN_IP_FILE ]; then
   OLD_WAN_IP=`cat $WAN_IP_FILE`
 else
-  echo "No file, need IP"
+  echo "No record of previous IP available"
   OLD_WAN_IP=""
 fi
 
@@ -140,7 +152,7 @@ RESPONSE=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$CFZONE_ID
   -H "X-Auth-Email: $CFUSER" \
   -H "X-Auth-Key: $CFKEY" \
   -H "Content-Type: application/json" \
-  --data "{\"id\":\"$CFZONE_ID\",\"type\":\"$CFRECORD_TYPE\",\"name\":\"$CFRECORD_NAME\",\"content\":\"$WAN_IP\", \"ttl\":$CFTTL, \"proxied\":$CFRECORD_PROXIED}")
+  --data "{\"id\":\"$CFZONE_ID\",\"type\":\"$CFRECORD_TYPE\",\"name\":\"$CFRECORD_NAME\",\"content\":\"$WAN_IP\",\"ttl\":$CFTTL,\"proxied\":$CFRECORD_PROXIED}")
 
 if [ "$RESPONSE" != "${RESPONSE%success*}" ] && [ "$(echo $RESPONSE | grep "\"success\":true")" != "" ]; then
   echo "Updated succesfuly!"

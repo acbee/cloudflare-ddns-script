@@ -12,5 +12,6 @@ bash <(curl -fsSL git.io/cf-ddns.sh) \
     -h host.example.com \
     -t A|AAAA \
     -p true \
+    -o 1.2.3.4 \
     -f false
 ```
