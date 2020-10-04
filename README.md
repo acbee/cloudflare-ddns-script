@@ -10,6 +10,7 @@ bash <(curl -fsSL git.io/cf-ddns.sh) \
     -u user@example.com \
     -z example.com \
     -h host.example.com \
-    -t A|AAAA
-    -f true
+    -t A|AAAA \
+    -p true \
+    -f false
 ```
